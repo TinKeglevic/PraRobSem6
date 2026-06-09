@@ -19,6 +19,7 @@ def generate_world_points_R(checkerboard_dim=checkerboard_dimensions, square_siz
     objp *= square_size
 
     ## transform points to {R} frame
+    # yeet yeet yeet
     T_R_checkerboard = np.eye(4)
     T_R_checkerboard[0,0] = 1
     T_R_checkerboard[1,1] = -1
