@@ -1,0 +1,44 @@
+==== git repozitorij i workspace za ros ====
+
+# prije preuzimanja repozitorija na računalu treba biti mapa
+# ~/ros2_ws i treba biti prazna
+
+cd ~/ros2_ws
+git clone https://github.com/TinKeglevic/PraRobSem6
+mv PraRobSem6 src
+
+cd ~/ros2_ws/src
+git config user.name (github username)
+git config user.email (github email)
+
+cd ~/ros2_ws
+colcon build
+
+
+
+==== inverzna kinematika ====
+
+# prvo treba instalirati specifične verzije pydantica i numpyja
+python3 -m pip install --break-system-packages "pydantic==1.10.15"
+python3 -m pip install --break-system-packages "numpy==1.26.4"
+
+Prvi terminal)
+
+# ovu naredbu treba pokrenuti svaki put kada na laptop spojite usb za robotsku ruku
+sudo chmod 777 /dev/ttyUSB0
+
+ros2 launch PraRobSem6 init_inv_kinematics.launch.py
+
+Drugi terminal)
+python3 ~/ros2_ws/src/PraRobSem6/scripts/test_arm_control.py
+
+
+==== yolo ====
+prvo treba u /opt/ros/jazzy/share/usb_cam/config/params_1.yaml pod "video_device" napisati "/dev/video2" za kameru na labosu (ili "/dev/video0" za kameru na laptopu)
+
+Prvi terminal)
+ros2 launch usb_cam camera.launch.py
+
+Drugi terminal)
+source ~/ros2_ws/src/prarob_yolo/.venv/bin/activate
+ros2 launch yolo_bringup yolov12.launch.py input_image_topic:=/camera1/image_raw device:=cpu

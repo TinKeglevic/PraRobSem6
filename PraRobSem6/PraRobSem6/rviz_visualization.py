@@ -10,9 +10,9 @@ class RVizMarkerNode(Node):
         super().__init__("rviz_marker_node")
 
         # Dimenzije robota u metrima — mora biti isto kao u kinematics_node
-        self.L1 = 0.09
-        self.L2 = 0.198
-        self.L3 = 0.059
+        self.L1 = 0.084
+        self.L2 = 0.2
+        self.L3 = 0.19
 
         # Stvarni kutovi s motora -> crvena sfera
         self.create_subscription(

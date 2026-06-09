@@ -30,7 +30,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "kinematics_node=PraRobSem6.kinematics_node:main"
+            "kinematics_node=PraRobSem6.kinematics_node:main",
+            "rviz_visualization=PraRobSem6.rviz_visualization:main"
         ],
     },
 )

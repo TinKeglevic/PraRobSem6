@@ -33,7 +33,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://ros2_prarob/meshes/postolje_seminar_v1.stl" scale="0.01 0.01 0.01"/>
+        <mesh filename="package://PraRobSem6/meshes/postolje_seminar_v1.stl" scale="0.01 0.01 0.01"/>
       </geometry>
       <material name="">
         <color rgba="0.054901960784313725 0.054901960784313725 0.06274509803921569 1.0"/>
@@ -52,7 +52,7 @@
   <joint name="joint1" type="revolute">
     <parent link="link1"/>
     <child link="link2"/>
-    <origin xyz="0.0 0.0 1.0" rpy="0 0 0"/>
+    <origin xyz="0.0 10.0 1.0" rpy="0 1.52 0"/>
     <axis xyz="0 0 1"/>
     <limit velocity="10.0" effort="1" lower="-2.82743338823" upper="2.82743338823" />
   </joint>
@@ -62,7 +62,7 @@
     <visual>
       <origin xyz="0 0 0.3" rpy="0 0 0"/>
       <geometry>
-        <box size="0.05 0.05 0.6"/>
+        <box size="0.7 0.5 0.84"/>
       </geometry>
       <color rgba="0 0.8 0.0 1"/>
     </visual>
@@ -70,7 +70,7 @@
     <collision>
       <origin xyz="0 0 0.3" rpy="0 0 0"/>
       <geometry>
-        <box size="0.05 0.05 0.6"/>
+        <box size="0.7 0.5 0.84"/>
       </geometry>
     </collision>
   </link>
@@ -89,7 +89,7 @@
     <visual>
       <origin xyz="0.15 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.3 0.05 0.05"/>
+        <box size="2.0 0.12 0.3"/>
       </geometry>
       <color rgba="0 0 0.8 1"/>
     </visual>
@@ -102,7 +102,7 @@
     </collision>
   </link>
 
-  <!-- Joint 2 -->
+  <!-- Joint 3 -->
   <joint name="joint3" type="revolute">
     <parent link="link3"/>
     <child link="link_tool"/>
