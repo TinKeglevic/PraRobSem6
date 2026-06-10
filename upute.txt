@@ -18,12 +18,9 @@ colcon build
 
 ==== inverzna kinematika ====
 
-# prvo treba instalirati specifične verzije pydantica i numpyja
-python3 -m pip install --break-system-packages "pydantic==1.10.15"
-python3 -m pip install --break-system-packages "numpy==1.26.4"
 
 Prvi terminal)
-
+source ~/ros2_ws/src/PraRobSem6/.robot_control_py_venv/bin/activate
 # ovu naredbu treba pokrenuti svaki put kada na laptop spojite usb za robotsku ruku
 sudo chmod 777 /dev/ttyUSB0
 
