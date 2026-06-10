@@ -24,8 +24,8 @@ def generate_world_points_R(checkerboard_dim=checkerboard_dimensions, square_siz
     T_R_checkerboard[1,1] = -1
     T_R_checkerboard[2,2] = -1
     T_R_checkerboard[0,3] = 0.0423
-    T_R_checkerboard[1,3] = 0.4
-    T_R_checkerboard[2,3] = 4.5
+    T_R_checkerboard[1,3] = -0.3
+    T_R_checkerboard[2,3] = 11.0
 
     objp_h = np.hstack((objp, np.ones((objp.shape[0], 1))))
     objp_t = T_R_checkerboard.dot(objp_h.T)
@@ -91,8 +91,10 @@ class CamToWorld(Node):
             self.get_logger().info('Receiving video frame')
         else:
             self.get_logger().info('Waiting for camera info')
-        current_frame = self.br.imgmsg_to_cv2(data)
-        rgb_image = cv2.cvtColor(current_frame, cv2.COLOR_RGB2BGR) ## ROS is RGB, OpenCV is BGR
+        current_frame = self.br.imgmsg_to_cv2(data, desired_encoding='bgr8')
+        print(current_frame.shape)
+        print(current_frame.dtype)
+        rgb_image = current_frame # cv2.cvtColor(current_frame, cv2.COLOR_RGB2BGR) ## ROS is RGB, OpenCV is BGR
 
         ## detect checkerboard
 
