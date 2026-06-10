@@ -77,11 +77,12 @@ class KinematicsNode(Node):
         )
 
         # Publisheri
+       
         self.cmd_publisher = self.create_publisher(
             JointTrajectory, "/arm_controller/joint_trajectory", 10
         )
         self.target_state_publisher = self.create_publisher(
-            JointState, "/arm_controller/target_joint_states", 10
+            JointState, "/rrr_arm/target_joint_states", 10
         )
 
         self.get_logger().info("Kinematics node pokrenut.")
@@ -121,10 +122,10 @@ class KinematicsNode(Node):
             )
 
             self.get_logger().info(  # ← dodaj ovo
-            f"Cilj ({x:.3f}, {y:.3f}, {z:.3f}) m -> "
-            f"q1={math.degrees(q1):.1f}°, "
-            f"q2={math.degrees(q2):.1f}°, "
-            f"q3={math.degrees(q3):.1f}°"
+                f"Cilj ({x:.3f}, {y:.3f}, {z:.3f}) m -> "
+                f"q1={math.degrees(q1):.1f}°, "
+                f"q2={math.degrees(q2):.1f}°, "
+                f"q3={math.degrees(q3):.1f}°"
             )
 
             self._send_joint_command(q1, q2, q3)

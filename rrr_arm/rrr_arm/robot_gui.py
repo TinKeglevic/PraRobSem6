@@ -1,75 +1,97 @@
 #!/usr/bin/env python3
-
 import sys
-import numpy as np
+import math
 import rclpy
 from rclpy.node import Node
 from rclpy.duration import Duration
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+from sensor_msgs.msg import JointState
+from geometry_msgs.msg import Point
+from std_msgs.msg import String
+
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QSlider, QLineEdit, QPushButton, QTabWidget, QGroupBox,
-    QTextEdit, QGridLayout, QFrame
+    QTextEdit, QGridLayout
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt5.QtGui import QFont, QColor
-import threading
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QObject
+from PyQt5.QtGui import QFont
+
 
 # ─────────────────────────────────────────────
-#  KINEMATIKA - ZAMIJENI VRIJEDNOSTI SUTRA!
+#  SIGNALS — zasebni QObject za PyQt signale
 # ─────────────────────────────────────────────
-L1          = 0.173   # nadlaktica (os motor2 → os motor3)
-L2          = 0.200   # podlaktica (os motor3 → vrh markera)
-BASE_HEIGHT = 0.084   # visina od tla do osi motor1
-OFFSET      = 0.015   # horizontalni pomak motor1 → motor2
 
-def direct_kinematics(q1, q2, q3):
-    """Iz kutova zglobova daj (x, y, z) end-effektora."""
-    x1 = L1 * np.cos(q1) * np.cos(q2)
-    y1 = L1 * np.sin(q1) * np.cos(q2)
-    z1 = BASE_HEIGHT - L1 * np.sin(q2)
+class RobotSignals(QObject):
+    joint_states_received  = pyqtSignal(list)
+    target_states_received = pyqtSignal(list)
+    objects_detected       = pyqtSignal(str)
 
-    x = x1 + L2 * np.cos(q1) * np.cos(q2 + q3)
-    y = y1 + L2 * np.sin(q1) * np.cos(q2 + q3)
-    z = z1 - L2 * np.sin(q2 + q3)
-    return x, y, z
-
-def inverse_kinematics(x, y, z):
-    """Iz (x, y, z) end-effektora daj kutove zglobova."""
-    planar_dist = np.sqrt(max(x**2 + y**2 - OFFSET**2, 0))
-    d = np.sqrt(planar_dist**2 + BASE_HEIGHT**2)
-    D = (L1**2 + L2**2 - d**2) / (2 * L1 * L2)
-    Q = (L1**2 + d**2 - L2**2) / (2 * L1 * d)
-
-    if abs(D) > 1 or abs(Q) > 1:
-        raise ValueError("Pozicija izvan dosega robota!")
-
-    q3 = np.arccos(D) - 1.5708
-    delta_fi = np.arcsin(OFFSET / np.sqrt(x**2 + y**2))
-    q1 = np.arctan2(y, x) - delta_fi
-    q2 = np.pi - np.arctan2(planar_dist, BASE_HEIGHT) - np.arccos(Q)
-    return q1, q2, q3
 
 # ─────────────────────────────────────────────
-#  ROS2 NODE (radi u pozadini)
+#  ROS2 NODE
 # ─────────────────────────────────────────────
+
 class RobotNode(Node):
     def __init__(self):
         super().__init__('robot_gui_node')
-        self.publisher = self.create_publisher(
-            JointTrajectory,
-            '/joint_trajectory_controller/joint_trajectory',
-            10
+        self.signals = RobotSignals()
+
+        # Publisheri
+        self.marker_pub = self.create_publisher(
+            Point, '/marker_target', 10
         )
+        self.joint_cmd_pub = self.create_publisher(
+            JointTrajectory, '/arm_controller/joint_trajectory', 10
+        )
+        self.nlp_pub = self.create_publisher(
+            String, '/nlp_command', 10
+        )
+
+        # Subscriberi
+        self.create_subscription(
+            JointState, '/joint_states', self._on_joint_states, 10
+        )
+        self.create_subscription(
+            JointState, '/rrr_arm/target_joint_states', self._on_target_states, 10
+        )
+        self.create_subscription(
+            String, '/detected_objects', self._on_detected_objects, 10
+        )
+
+    def send_xyz(self, x, y, z):
+        msg = Point()
+        msg.x = float(x)
+        msg.y = float(y)
+        msg.z = float(z)
+        self.marker_pub.publish(msg)
 
     def send_joints(self, q1, q2, q3, duration_sec=1.0):
         traj = JointTrajectory()
-        traj.joint_names = ['joint1', 'joint2', 'joint3']
+        traj.header.stamp = self.get_clock().now().to_msg()
+        traj.joint_names = ['zglob_1', 'zglob_2', 'zglob_3']
         point = JointTrajectoryPoint()
         point.positions = [float(q1), float(q2), float(q3)]
         point.time_from_start = Duration(seconds=duration_sec).to_msg()
         traj.points.append(point)
-        self.publisher.publish(traj)
+        self.joint_cmd_pub.publish(traj)
+
+    def send_nlp_command(self, cmd):
+        msg = String()
+        msg.data = cmd
+        self.nlp_pub.publish(msg)
+
+    def _on_joint_states(self, msg):
+        if len(msg.position) >= 3:
+            self.signals.joint_states_received.emit(list(msg.position[:3]))
+
+    def _on_target_states(self, msg):
+        if len(msg.position) >= 3:
+            self.signals.target_states_received.emit(list(msg.position[:3]))
+
+    def _on_detected_objects(self, msg):
+        self.signals.objects_detected.emit(msg.data)
+
 
 class RosThread(QThread):
     def __init__(self, node):
@@ -79,15 +101,23 @@ class RosThread(QThread):
     def run(self):
         rclpy.spin(self.node)
 
+
 # ─────────────────────────────────────────────
-#  GLAVNI GUI
+#  GUI
 # ─────────────────────────────────────────────
+
 class RobotGUI(QMainWindow):
     def __init__(self, robot_node):
         super().__init__()
         self.robot_node = robot_node
-        self.setWindowTitle("Robot Controller")
+        self.setWindowTitle("RRR Robot Controller")
         self.setMinimumSize(700, 600)
+
+        # Povezi signale
+        self.robot_node.signals.joint_states_received.connect(self._on_joint_states)
+        self.robot_node.signals.target_states_received.connect(self._on_target_states)
+        self.robot_node.signals.objects_detected.connect(self._on_objects_detected)
+
         self._setup_style()
         self._build_ui()
 
@@ -106,48 +136,43 @@ class RobotGUI(QMainWindow):
             QLineEdit:focus { border: 1px solid #4fc3f7; }
             QPushButton { background: #0f3460; border: none; border-radius: 4px; padding: 8px 16px; color: #e0e0e0; }
             QPushButton:hover { background: #4fc3f7; color: #1a1a2e; }
-            QPushButton:pressed { background: #0288d1; }
             QPushButton#send_btn { background: #1b5e20; font-weight: bold; padding: 10px; }
             QPushButton#send_btn:hover { background: #2e7d32; }
             QTextEdit { background: #0d0d1a; border: 1px solid #333; border-radius: 4px; color: #4fc3f7; font-family: monospace; }
             QLabel#status { color: #4fc3f7; font-size: 11px; }
-            QFrame#divider { background: #333; }
         """)
 
     def _build_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
-        main_layout = QVBoxLayout(central)
-        main_layout.setSpacing(8)
-        main_layout.setContentsMargins(12, 12, 12, 12)
+        layout = QVBoxLayout(central)
+        layout.setSpacing(8)
+        layout.setContentsMargins(12, 12, 12, 12)
 
-        # Naslov
-        title = QLabel("🤖 ROBOT CONTROLLER")
+        title = QLabel("RRR ROBOT CONTROLLER")
         title.setFont(QFont("monospace", 16, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("color: #4fc3f7; padding: 8px;")
-        main_layout.addWidget(title)
+        layout.addWidget(title)
 
-        # Tabs
         tabs = QTabWidget()
-        tabs.addTab(self._build_manual_dk_tab(), "Manual — Direktna kinematika")
-        tabs.addTab(self._build_manual_ik_tab(), "Manual — Inverzna kinematika")
-        tabs.addTab(self._build_autonomous_tab(), "Autonomni mod")
-        main_layout.addWidget(tabs)
+        tabs.addTab(self._build_dk_tab(), "Direktna kinematika")
+        tabs.addTab(self._build_ik_tab(), "Inverzna kinematika")
+        tabs.addTab(self._build_auto_tab(), "Autonomni mod")
+        layout.addWidget(tabs)
 
-        # Status bar
         self.status_label = QLabel("Spreman.")
         self.status_label.setObjectName("status")
         self.status_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(self.status_label)
+        layout.addWidget(self.status_label)
 
     # ── TAB 1: Direktna kinematika ──────────────────────────────────────
-    def _build_manual_dk_tab(self):
+    def _build_dk_tab(self):
         w = QWidget()
         layout = QVBoxLayout(w)
         layout.setSpacing(10)
 
-        info = QLabel("Unesi kutove zglobova → robot se pomiče → prikazuje se pozicija end-effektora.")
+        info = QLabel("Unesi kutove zglobova → publishа se na /arm_controller/joint_trajectory → motori se pomaknu.")
         info.setStyleSheet("color: #888; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -160,13 +185,11 @@ class RobotGUI(QMainWindow):
         self.dk_labels  = []
 
         for i, (name, lo, hi, default) in enumerate([
-            ("q1 (rotacija baze)", -3.14, 3.14, 0.0),
-            ("q2 (rameni zglob)",  -1.57, 1.57, 0.5),
-            ("q3 (laktni zglob)",  -1.57, 1.57, -0.5),
+            ("zglob_1 (baza)",  -3.14, 3.14,  0.0),
+            ("zglob_2 (rame)",  -3.14, 3.14,  0.5),
+            ("zglob_3 (lakat)", -3.14, 3.14, -0.5),
         ]):
-            lbl = QLabel(name)
-            lbl.setStyleSheet("color: #ccc;")
-            jl.addWidget(lbl, i, 0)
+            jl.addWidget(QLabel(name), i, 0)
 
             slider = QSlider(Qt.Horizontal)
             slider.setMinimum(int(lo * 100))
@@ -183,24 +206,21 @@ class RobotGUI(QMainWindow):
             val_lbl.setStyleSheet("color: #4fc3f7;")
             jl.addWidget(val_lbl, i, 3)
 
-            # Slider → input i label
-            idx = i
-            def on_slider(val, ii=idx):
+            def on_slider(val, ii=i):
                 rad = val / 100.0
+                self.dk_inputs[ii].blockSignals(True)
                 self.dk_inputs[ii].setText(f"{rad:.3f}")
+                self.dk_inputs[ii].blockSignals(False)
                 self.dk_labels[ii].setText(f"{rad:.3f} rad")
-                self._update_dk_position()
             slider.valueChanged.connect(on_slider)
 
-            # Input → slider i label
-            def on_input(text, ii=idx):
+            def on_input(text, ii=i):
                 try:
                     rad = float(text)
                     self.dk_sliders[ii].blockSignals(True)
                     self.dk_sliders[ii].setValue(int(rad * 100))
                     self.dk_sliders[ii].blockSignals(False)
                     self.dk_labels[ii].setText(f"{rad:.3f} rad")
-                    self._update_dk_position()
                 except ValueError:
                     pass
             val_input.textChanged.connect(on_input)
@@ -211,8 +231,8 @@ class RobotGUI(QMainWindow):
 
         layout.addWidget(joints_box)
 
-        # Pozicija end-effektora
-        pos_box = QGroupBox("Pozicija end-effektora (direktna kinematika)")
+        # Stvarna pozicija dolazi iz /joint_states
+        pos_box = QGroupBox("Stvarna pozicija end-effektora (iz /joint_states)")
         pl = QHBoxLayout(pos_box)
         self.dk_x_lbl = QLabel("x = —")
         self.dk_y_lbl = QLabel("y = —")
@@ -223,27 +243,12 @@ class RobotGUI(QMainWindow):
             pl.addWidget(l)
         layout.addWidget(pos_box)
 
-        self._update_dk_position()
-
-        # Gumb pošalji
-        btn = QPushButton("▶  Pošalji na robot")
+        btn = QPushButton("▶  Pošalji kutove na robot")
         btn.setObjectName("send_btn")
         btn.clicked.connect(self._send_dk)
         layout.addWidget(btn)
         layout.addStretch()
         return w
-
-    def _update_dk_position(self):
-        try:
-            q1 = float(self.dk_inputs[0].text())
-            q2 = float(self.dk_inputs[1].text())
-            q3 = float(self.dk_inputs[2].text())
-            x, y, z = direct_kinematics(q1, q2, q3)
-            self.dk_x_lbl.setText(f"x = {x:.4f} m")
-            self.dk_y_lbl.setText(f"y = {y:.4f} m")
-            self.dk_z_lbl.setText(f"z = {z:.4f} m")
-        except Exception:
-            pass
 
     def _send_dk(self):
         try:
@@ -256,89 +261,63 @@ class RobotGUI(QMainWindow):
             self._set_status(f"✗ Greška: {e}", error=True)
 
     # ── TAB 2: Inverzna kinematika ──────────────────────────────────────
-    def _build_manual_ik_tab(self):
+    def _build_ik_tab(self):
         w = QWidget()
         layout = QVBoxLayout(w)
         layout.setSpacing(10)
 
-        info = QLabel("Unesi željenu poziciju end-effektora → robot se pomiče → prikazuju se kutovi zglobova.")
+        info = QLabel("Unesi XYZ → publishа se na /marker_target → kinematics_node računa IK → kutovi dolaze na /rrr_arm/target_joint_states.")
         info.setStyleSheet("color: #888; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
 
-        pos_box = QGroupBox("Pozicija end-effektora (metri)")
+        pos_box = QGroupBox("Željena pozicija end-effektora (metri)")
         pl = QGridLayout(pos_box)
-
         self.ik_inputs = {}
-        for i, (axis, default) in enumerate([("x", 0.15), ("y", 0.10), ("z", 0.0)]):
+        for i, (axis, default) in enumerate([("x", 0.15), ("y", 0.10), ("z", 0.09)]):
             pl.addWidget(QLabel(f"{axis} (m):"), i, 0)
             inp = QLineEdit(str(default))
-            inp.textChanged.connect(self._update_ik_joints)
             pl.addWidget(inp, i, 1)
             self.ik_inputs[axis] = inp
-
         layout.addWidget(pos_box)
 
-        # Zglobovi
-        joints_box = QGroupBox("Kutovi zglobova (inverzna kinematika)")
+        joints_box = QGroupBox("Izračunati kutovi (iz kinematics_node → /rrr_arm/target_joint_states)")
         jl = QHBoxLayout(joints_box)
-        self.ik_q1_lbl = QLabel("q1 = —")
-        self.ik_q2_lbl = QLabel("q2 = —")
-        self.ik_q3_lbl = QLabel("q3 = —")
+        self.ik_q1_lbl = QLabel("zglob_1 = —")
+        self.ik_q2_lbl = QLabel("zglob_2 = —")
+        self.ik_q3_lbl = QLabel("zglob_3 = —")
         for l in [self.ik_q1_lbl, self.ik_q2_lbl, self.ik_q3_lbl]:
             l.setStyleSheet("color: #4fc3f7; font-size: 13px;")
             l.setAlignment(Qt.AlignCenter)
             jl.addWidget(l)
         layout.addWidget(joints_box)
 
-        self._update_ik_joints()
-
-        btn = QPushButton("▶  Pošalji na robot")
+        btn = QPushButton("▶  Pošalji poziciju na kinematics_node")
         btn.setObjectName("send_btn")
         btn.clicked.connect(self._send_ik)
         layout.addWidget(btn)
         layout.addStretch()
         return w
 
-    def _update_ik_joints(self):
+    def _send_ik(self):
         try:
             x = float(self.ik_inputs["x"].text())
             y = float(self.ik_inputs["y"].text())
             z = float(self.ik_inputs["z"].text())
-            q1, q2, q3 = inverse_kinematics(x, y, z)
-            self.ik_q1_lbl.setText(f"q1 = {q1:.4f} rad")
-            self.ik_q2_lbl.setText(f"q2 = {q2:.4f} rad")
-            self.ik_q3_lbl.setText(f"q3 = {q3:.4f} rad")
-            self._last_ik = (q1, q2, q3)
-        except ValueError as e:
-            self.ik_q1_lbl.setText("—")
-            self.ik_q2_lbl.setText("izvan dosega")
-            self.ik_q3_lbl.setText("—")
-            self._last_ik = None
-        except Exception:
-            self._last_ik = None
-
-    def _send_ik(self):
-        self._update_ik_joints()
-        if hasattr(self, '_last_ik') and self._last_ik:
-            q1, q2, q3 = self._last_ik
-            self.robot_node.send_joints(q1, q2, q3)
-            x = float(self.ik_inputs["x"].text())
-            y = float(self.ik_inputs["y"].text())
-            z = float(self.ik_inputs["z"].text())
-            self._set_status(f"✓ Poslano na poziciju: x={x:.3f}, y={y:.3f}, z={z:.3f}")
-        else:
-            self._set_status("✗ Pozicija izvan dosega robota!", error=True)
+            self.robot_node.send_xyz(x, y, z)
+            self._set_status(f"✓ Poslano: x={x:.3f}, y={y:.3f}, z={z:.3f}")
+        except Exception as e:
+            self._set_status(f"✗ Greška: {e}", error=True)
 
     # ── TAB 3: Autonomni mod ────────────────────────────────────────────
-    def _build_autonomous_tab(self):
+    def _build_auto_tab(self):
         w = QWidget()
         layout = QVBoxLayout(w)
         layout.setSpacing(10)
 
         info = QLabel(
-            "Unesi prirodnojezičnu naredbu. Primjer: 'spoji avion i auto, izbjegni loptu'.\n"
-            "Sustav će prepoznati objekte i planirati putanju."
+            "Unesi naredbu → publishа se na /nlp_command → "
+            "YOLO node detektira objekte → rezultati dolaze na /detected_objects."
         )
         info.setStyleSheet("color: #888; font-size: 11px;")
         info.setWordWrap(True)
@@ -350,21 +329,25 @@ class RobotGUI(QMainWindow):
         self.nlp_input.setPlaceholderText("npr. 'spoji avion i auto, izbjegni loptu'")
         self.nlp_input.returnPressed.connect(self._send_autonomous)
         cl.addWidget(self.nlp_input)
-
         send_btn = QPushButton("▶  Izvrši naredbu")
         send_btn.setObjectName("send_btn")
         send_btn.clicked.connect(self._send_autonomous)
         cl.addWidget(send_btn)
         layout.addWidget(cmd_box)
 
+        obj_box = QGroupBox("Detektirani objekti (iz /detected_objects)")
+        ol = QVBoxLayout(obj_box)
+        self.detected_label = QLabel("—")
+        self.detected_label.setStyleSheet("color: #4fc3f7;")
+        ol.addWidget(self.detected_label)
+        layout.addWidget(obj_box)
+
         log_box = QGroupBox("Log")
         ll = QVBoxLayout(log_box)
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
-        self.log_output.setMinimumHeight(200)
-        self.log_output.setPlaceholderText("Ovdje će se prikazivati log izvršavanja...")
+        self.log_output.setMinimumHeight(150)
         ll.addWidget(self.log_output)
-
         clear_btn = QPushButton("Očisti log")
         clear_btn.clicked.connect(self.log_output.clear)
         ll.addWidget(clear_btn)
@@ -378,60 +361,42 @@ class RobotGUI(QMainWindow):
         if not cmd:
             self._set_status("✗ Unesi naredbu!", error=True)
             return
-
+        self.robot_node.send_nlp_command(cmd)
         self.log_output.append(f">> {cmd}")
+        self._set_status(f"▶ Naredba poslana: '{cmd}'")
 
-        # Parsiranje naredbe - traži 'spoji X i Y, izbjegni Z'
-        cmd_lower = cmd.lower()
-        start_obj, target_obj, avoid_obj = None, None, None
+    # ── ROS callbacks ───────────────────────────────────────────────────
+    def _on_joint_states(self, angles):
+        """Stvarni kutovi s motora → prikaži FK poziciju na DK tabu."""
+        q1, q2, q3 = angles
+        # GUI ne računa FK — to radi kinematics_node
+        # Ovdje samo prikazujemo kutove
+        self.dk_x_lbl.setText(f"q1={math.degrees(q1):.1f}°")
+        self.dk_y_lbl.setText(f"q2={math.degrees(q2):.1f}°")
+        self.dk_z_lbl.setText(f"q3={math.degrees(q3):.1f}°")
 
-        try:
-            if "spoji" in cmd_lower:
-                after_spoji = cmd_lower.split("spoji")[1]
-                if " i " in after_spoji:
-                    parts = after_spoji.split(" i ")
-                    start_obj = parts[0].strip().split(",")[0].strip()
-                    rest = parts[1]
-                    if "izbjegni" in rest:
-                        target_obj = rest.split("izbjegni")[0].strip().rstrip(",").strip()
-                        avoid_obj = rest.split("izbjegni")[1].strip()
-                    else:
-                        target_obj = rest.strip()
-            elif "connect" in cmd_lower:
-                after = cmd_lower.split("connect")[1]
-                if " and " in after:
-                    parts = after.split(" and ")
-                    start_obj = parts[0].strip()
-                    rest = parts[1]
-                    if "avoid" in rest:
-                        target_obj = rest.split("avoid")[0].strip().rstrip(",").strip()
-                        avoid_obj = rest.split("avoid")[1].strip()
-                    else:
-                        target_obj = rest.strip()
-        except Exception:
-            pass
+    def _on_target_states(self, angles):
+        """Ciljni kutovi iz kinematics_node → prikaži na IK tabu."""
+        q1, q2, q3 = angles
+        self.ik_q1_lbl.setText(f"zglob_1 = {math.degrees(q1):.1f}°")
+        self.ik_q2_lbl.setText(f"zglob_2 = {math.degrees(q2):.1f}°")
+        self.ik_q3_lbl.setText(f"zglob_3 = {math.degrees(q3):.1f}°")
 
-        if start_obj and target_obj:
-            self.log_output.append(f"   Start objekt: {start_obj}")
-            self.log_output.append(f"   Ciljni objekt: {target_obj}")
-            if avoid_obj:
-                self.log_output.append(f"   Izbjegavaj: {avoid_obj}")
-            self.log_output.append("   Pokretanje YOLO detekcije i planiranja putanje...")
-            self._set_status(f"▶ Izvršavam: {start_obj} → {target_obj}")
-            # TODO: ovdje pozovi autonomni node s start_obj i target_obj
-        else:
-            self.log_output.append("   ✗ Nisam prepoznao objekte. Koristi format: 'spoji X i Y, izbjegni Z'")
-            self._set_status("✗ Format naredbe nije prepoznat.", error=True)
+    def _on_objects_detected(self, data):
+        """Detektirani objekti iz YOLO noda."""
+        self.detected_label.setText(data)
+        self.log_output.append(f"   Detektirani: {data}")
 
-    # ── Helpers ─────────────────────────────────────────────────────────
     def _set_status(self, msg, error=False):
         color = "#ef5350" if error else "#4fc3f7"
         self.status_label.setStyleSheet(f"color: {color}; font-size: 11px;")
         self.status_label.setText(msg)
 
+
 # ─────────────────────────────────────────────
 #  MAIN
 # ─────────────────────────────────────────────
+
 def main():
     rclpy.init()
     robot_node = RobotNode()
@@ -447,6 +412,7 @@ def main():
 
     rclpy.shutdown()
     sys.exit(exit_code)
+
 
 if __name__ == '__main__':
     main()

@@ -26,7 +26,9 @@ setup(
         'console_scripts': [
             'kinematika = rrr_arm.kinematika:main',
             'robot_gui = rrr_arm.robot_gui:main',
-            'rviz_visualization = rrr_arm.rviz_visualization:main'
+            'rviz_visualization = rrr_arm.rviz_visualization:main',
+            'path_planning = rrr_arm.path_planning_node:main',
+            'autonomous = rrr_arm.autonomous:main'
         ],
     },
 )
