@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>prarob_interact</name>
+  <version>0.0.0</version>
+  <description>ROSA-enabled package for the robotics practicum course at UNIZG-FER.</description>
+  <maintainer email="pero.drobac@fer.hr">root</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>dotenv</exec_depend>
+  <exec_depend>langchain_openai</exec_depend>
+  <exec_depend>jpl-rosa</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
