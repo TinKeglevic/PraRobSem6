@@ -18,19 +18,11 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QObject
 from PyQt5.QtGui import QFont
 
 
-# ─────────────────────────────────────────────
-#  SIGNALS — zasebni QObject za PyQt signale
-# ─────────────────────────────────────────────
-
 class RobotSignals(QObject):
     joint_states_received  = pyqtSignal(list)
     target_states_received = pyqtSignal(list)
     objects_detected       = pyqtSignal(str)
 
-
-# ─────────────────────────────────────────────
-#  ROS2 NODE
-# ─────────────────────────────────────────────
 
 class RobotNode(Node):
     def __init__(self):
@@ -42,7 +34,7 @@ class RobotNode(Node):
             Point, '/marker_target', 10
         )
         self.joint_cmd_pub = self.create_publisher(
-            JointTrajectory, '/arm_controller/joint_trajectory', 10
+            JointTrajectory, '/joint_trajectory_controller/joint_trajectory', 10
         )
         self.nlp_pub = self.create_publisher(
             String, '/nlp_command', 10
@@ -53,7 +45,7 @@ class RobotNode(Node):
             JointState, '/joint_states', self._on_joint_states, 10
         )
         self.create_subscription(
-            JointState, '/rrr_arm/target_joint_states', self._on_target_states, 10
+            JointState, '/joint_trajectory_controller/target_joint_states', self._on_target_states, 10
         )
         self.create_subscription(
             String, '/detected_objects', self._on_detected_objects, 10
@@ -69,7 +61,7 @@ class RobotNode(Node):
     def send_joints(self, q1, q2, q3, duration_sec=1.0):
         traj = JointTrajectory()
         traj.header.stamp = self.get_clock().now().to_msg()
-        traj.joint_names = ['zglob_1', 'zglob_2', 'zglob_3']
+        traj.joint_names = ['joint1', 'joint2', 'joint3']
         point = JointTrajectoryPoint()
         point.positions = [float(q1), float(q2), float(q3)]
         point.time_from_start = Duration(seconds=duration_sec).to_msg()
@@ -102,10 +94,6 @@ class RosThread(QThread):
         rclpy.spin(self.node)
 
 
-# ─────────────────────────────────────────────
-#  GUI
-# ─────────────────────────────────────────────
-
 class RobotGUI(QMainWindow):
     def __init__(self, robot_node):
         super().__init__()
@@ -113,7 +101,6 @@ class RobotGUI(QMainWindow):
         self.setWindowTitle("RRR Robot Controller")
         self.setMinimumSize(700, 600)
 
-        # Povezi signale
         self.robot_node.signals.joint_states_received.connect(self._on_joint_states)
         self.robot_node.signals.target_states_received.connect(self._on_target_states)
         self.robot_node.signals.objects_detected.connect(self._on_objects_detected)
@@ -166,13 +153,12 @@ class RobotGUI(QMainWindow):
         self.status_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.status_label)
 
-    # ── TAB 1: Direktna kinematika ──────────────────────────────────────
     def _build_dk_tab(self):
         w = QWidget()
         layout = QVBoxLayout(w)
         layout.setSpacing(10)
 
-        info = QLabel("Unesi kutove zglobova → publishа se na /arm_controller/joint_trajectory → motori se pomaknu.")
+        info = QLabel("Unesi kutove zglobova → publishа se na /joint_trajectory_controller/joint_trajectory → motori se pomaknu.")
         info.setStyleSheet("color: #888; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -185,9 +171,9 @@ class RobotGUI(QMainWindow):
         self.dk_labels  = []
 
         for i, (name, lo, hi, default) in enumerate([
-            ("zglob_1 (baza)",  -3.14, 3.14,  0.0),
-            ("zglob_2 (rame)",  -3.14, 3.14,  0.5),
-            ("zglob_3 (lakat)", -3.14, 3.14, -0.5),
+            ("joint1 (baza)",  -3.14, 3.14,  0.0),
+            ("joint2 (rame)",  -3.14, 3.14,  0.5),
+            ("joint3 (lakat)", -3.14, 3.14, -0.5),
         ]):
             jl.addWidget(QLabel(name), i, 0)
 
@@ -231,12 +217,11 @@ class RobotGUI(QMainWindow):
 
         layout.addWidget(joints_box)
 
-        # Stvarna pozicija dolazi iz /joint_states
-        pos_box = QGroupBox("Stvarna pozicija end-effektora (iz /joint_states)")
+        pos_box = QGroupBox("Stvarni kutovi (iz /joint_states)")
         pl = QHBoxLayout(pos_box)
-        self.dk_x_lbl = QLabel("x = —")
-        self.dk_y_lbl = QLabel("y = —")
-        self.dk_z_lbl = QLabel("z = —")
+        self.dk_x_lbl = QLabel("q1 = —")
+        self.dk_y_lbl = QLabel("q2 = —")
+        self.dk_z_lbl = QLabel("q3 = —")
         for l in [self.dk_x_lbl, self.dk_y_lbl, self.dk_z_lbl]:
             l.setStyleSheet("color: #4fc3f7; font-size: 13px;")
             l.setAlignment(Qt.AlignCenter)
@@ -260,13 +245,12 @@ class RobotGUI(QMainWindow):
         except Exception as e:
             self._set_status(f"✗ Greška: {e}", error=True)
 
-    # ── TAB 2: Inverzna kinematika ──────────────────────────────────────
     def _build_ik_tab(self):
         w = QWidget()
         layout = QVBoxLayout(w)
         layout.setSpacing(10)
 
-        info = QLabel("Unesi XYZ → publishа se na /marker_target → kinematics_node računa IK → kutovi dolaze na /rrr_arm/target_joint_states.")
+        info = QLabel("Unesi XYZ → publishа se na /marker_target → kinematics_node računa IK → kutovi dolaze na /joint_trajectory_controller/target_joint_states.")
         info.setStyleSheet("color: #888; font-size: 11px;")
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -281,11 +265,11 @@ class RobotGUI(QMainWindow):
             self.ik_inputs[axis] = inp
         layout.addWidget(pos_box)
 
-        joints_box = QGroupBox("Izračunati kutovi (iz kinematics_node → /rrr_arm/target_joint_states)")
+        joints_box = QGroupBox("Izračunati kutovi (iz kinematics_node → /joint_trajectory_controller/target_joint_states)")
         jl = QHBoxLayout(joints_box)
-        self.ik_q1_lbl = QLabel("zglob_1 = —")
-        self.ik_q2_lbl = QLabel("zglob_2 = —")
-        self.ik_q3_lbl = QLabel("zglob_3 = —")
+        self.ik_q1_lbl = QLabel("joint1 = —")
+        self.ik_q2_lbl = QLabel("joint2 = —")
+        self.ik_q3_lbl = QLabel("joint3 = —")
         for l in [self.ik_q1_lbl, self.ik_q2_lbl, self.ik_q3_lbl]:
             l.setStyleSheet("color: #4fc3f7; font-size: 13px;")
             l.setAlignment(Qt.AlignCenter)
@@ -309,7 +293,6 @@ class RobotGUI(QMainWindow):
         except Exception as e:
             self._set_status(f"✗ Greška: {e}", error=True)
 
-    # ── TAB 3: Autonomni mod ────────────────────────────────────────────
     def _build_auto_tab(self):
         w = QWidget()
         layout = QVBoxLayout(w)
@@ -317,7 +300,7 @@ class RobotGUI(QMainWindow):
 
         info = QLabel(
             "Unesi naredbu → publishа se na /nlp_command → "
-            "YOLO node detektira objekte → rezultati dolaze na /detected_objects."
+            "autonomous node detektira objekte i planira putanju."
         )
         info.setStyleSheet("color: #888; font-size: 11px;")
         info.setWordWrap(True)
@@ -365,25 +348,19 @@ class RobotGUI(QMainWindow):
         self.log_output.append(f">> {cmd}")
         self._set_status(f"▶ Naredba poslana: '{cmd}'")
 
-    # ── ROS callbacks ───────────────────────────────────────────────────
     def _on_joint_states(self, angles):
-        """Stvarni kutovi s motora → prikaži FK poziciju na DK tabu."""
         q1, q2, q3 = angles
-        # GUI ne računa FK — to radi kinematics_node
-        # Ovdje samo prikazujemo kutove
-        self.dk_x_lbl.setText(f"q1={math.degrees(q1):.1f}°")
-        self.dk_y_lbl.setText(f"q2={math.degrees(q2):.1f}°")
-        self.dk_z_lbl.setText(f"q3={math.degrees(q3):.1f}°")
+        self.dk_x_lbl.setText(f"q1 = {math.degrees(q1):.1f}°")
+        self.dk_y_lbl.setText(f"q2 = {math.degrees(q2):.1f}°")
+        self.dk_z_lbl.setText(f"q3 = {math.degrees(q3):.1f}°")
 
     def _on_target_states(self, angles):
-        """Ciljni kutovi iz kinematics_node → prikaži na IK tabu."""
         q1, q2, q3 = angles
-        self.ik_q1_lbl.setText(f"zglob_1 = {math.degrees(q1):.1f}°")
-        self.ik_q2_lbl.setText(f"zglob_2 = {math.degrees(q2):.1f}°")
-        self.ik_q3_lbl.setText(f"zglob_3 = {math.degrees(q3):.1f}°")
+        self.ik_q1_lbl.setText(f"joint1 = {math.degrees(q1):.1f}°")
+        self.ik_q2_lbl.setText(f"joint2 = {math.degrees(q2):.1f}°")
+        self.ik_q3_lbl.setText(f"joint3 = {math.degrees(q3):.1f}°")
 
     def _on_objects_detected(self, data):
-        """Detektirani objekti iz YOLO noda."""
         self.detected_label.setText(data)
         self.log_output.append(f"   Detektirani: {data}")
 
@@ -392,10 +369,6 @@ class RobotGUI(QMainWindow):
         self.status_label.setStyleSheet(f"color: {color}; font-size: 11px;")
         self.status_label.setText(msg)
 
-
-# ─────────────────────────────────────────────
-#  MAIN
-# ─────────────────────────────────────────────
 
 def main():
     rclpy.init()

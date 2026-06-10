@@ -106,7 +106,7 @@ class AStarPlanner:
 #  FK — iste dimenzije kao kinematika.py
 # ─────────────────────────────────────────────
 
-def fk(q1, q2, q3, L1=0.084, L2=0.200, L3=0.167):
+def fk(q1, q2, q3, L1=0.084, L2=0.200, L3=0.19):
     r = L2 * math.sin(q2) + L3 * math.sin(q2 + q3)
     x = r * math.cos(q1)
     y = r * math.sin(q1)
