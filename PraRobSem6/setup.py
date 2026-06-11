@@ -31,7 +31,10 @@ setup(
     entry_points={
         'console_scripts': [
             "kinematics_node=PraRobSem6.kinematics_node:main",
-            "rviz_visualization=PraRobSem6.rviz_visualization:main"
+            "rviz_visualization=PraRobSem6.rviz_visualization:main",
+            "robot_gui=PraRobSem6.robot_gui:main",
+            "path_planner=PraRobSem6.path_planning_node:main",
+            "path_planner_new=PraRobSem6.path_planner_node_new:main"
         ],
     },
 )

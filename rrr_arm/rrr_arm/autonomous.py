@@ -67,7 +67,7 @@ def parse_nlp_command(cmd: str):
     )
     if connect_match:
         connect_str = connect_match.group(1).strip().rstrip(',').strip()
-        connect = [o.strip() for o in re.split(r'\s*(?:i|and|,)\s*', connect_str) if o.strip()]
+        connect = [o.strip() for o in re.split(r'\s*(?:\bi\b|and|,)\s*', connect_str) if o.strip()]
 
     return connect, avoid
 
@@ -109,7 +109,7 @@ class AutonomousNode(Node):
         # Subscriberi
         self.create_subscription(String, '/nlp_command', self._on_nlp, 10)
         self.create_subscription(DetectionArray, '/yolo/detections', self._on_yolo, 10)
-        self.create_subscription(CameraInfo, '/camera1/camera_info', self._on_camera_info, 10)
+        self.create_subscription(CameraInfo, '/camera_info', self._on_camera_info, 10)
 
         # Publisheri
         self.path_req_pub   = self.create_publisher(String, '/path_request', 10)
@@ -133,9 +133,7 @@ class AutonomousNode(Node):
         if self.k_matrix is None:
             self.k_matrix = np.reshape(np.array(msg.k), (3, 3))
             self.get_logger().info('K matrica učitana.')
-            self.destroy_subscription(
-                [s for s in self.subscriptions if s.topic_name == '/camera1/camera_info'][0]
-            )
+            
 
     def _on_yolo(self, msg):
         detections = {}

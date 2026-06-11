@@ -20,12 +20,12 @@ def generate_world_points_R(checkerboard_dim=checkerboard_dimensions, square_siz
 
     ## transform points to {R} frame
     T_R_checkerboard = np.eye(4)
-    T_R_checkerboard[0, 0] = 1
-    T_R_checkerboard[1, 1] = -1
-    T_R_checkerboard[2, 2] = -1
-    T_R_checkerboard[0, 3] = 0.0423
-    T_R_checkerboard[1, 3] = -0.3
-    T_R_checkerboard[2, 3] = 11.0
+    T_R_checkerboard[0,0] = 1
+    T_R_checkerboard[1,1] = -1
+    T_R_checkerboard[2,2] = -1
+    T_R_checkerboard[0,3] = 0.0423
+    T_R_checkerboard[1,3] = 0.4
+    T_R_checkerboard[2,3] = 4.5
 
     objp_h = np.hstack((objp, np.ones((objp.shape[0], 1))))
     objp_t = T_R_checkerboard.dot(objp_h.T)
