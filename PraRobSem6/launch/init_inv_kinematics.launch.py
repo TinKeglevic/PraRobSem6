@@ -71,9 +71,16 @@ def generate_launch_description():
         ),
 
         Node(
-            package="PraRobSem6",
-            executable="kinematics_node",
+            package="rrr_arm",
+            executable="kinematika",
             name="kinematics_node",
+            output="screen"
+        ),
+
+        Node(
+            package="rrr_arm",
+            executable="robot_gui",
+            name="robot_gui",
             output="screen"
         )
 

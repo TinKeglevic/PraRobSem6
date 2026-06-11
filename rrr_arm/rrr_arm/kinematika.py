@@ -33,7 +33,7 @@ class RRRKinematics:
 
         cos_theta3 = (D**2 - self.L2**2 - self.L3**2) / (2 * self.L2 * self.L3)
         cos_theta3 = max(min(cos_theta3, 1.0), -1.0)
-        theta3 = math.acos(cos_theta3)
+        theta3 = -math.acos(cos_theta3)
 
         alpha = math.atan2(r, z_proj)
         beta = math.atan2(
@@ -79,7 +79,7 @@ class KinematicsNode(Node):
         # Publisheri
        
         self.cmd_publisher = self.create_publisher(
-            JointTrajectory, "/arm_controller/joint_trajectory", 10
+            JointTrajectory, "/joint_trajectory_controller/joint_trajectory", 10
         )
         self.target_state_publisher = self.create_publisher(
             JointState, "/rrr_arm/target_joint_states", 10
