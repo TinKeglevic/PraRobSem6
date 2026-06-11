@@ -10,10 +10,11 @@
     <axis xyz="0 0 1" />
   </joint>
 
+
 <!-- Link 1 - stl -->
   <link name="link1">
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin rpy="0 0 0" xyz="0 0 0.0435"/>
       <geometry>
         <mesh filename="package://PraRobSem6/meshes/postolje_i_baza.stl" scale="0.01 0.01 0.01"/>
       </geometry>
@@ -31,7 +32,7 @@
   <joint name="joint1" type="revolute">
     <parent link="link1"/>
     <child link="link2"/>
-    <origin xyz="0.0 0 0" rpy="0 0 0"/>
+    <origin xyz="0 0 0.087" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
     <limit velocity="10.0" effort="1" lower="-2.82743338823" upper="2.82743338823" />
   </joint>
@@ -39,15 +40,17 @@
   <!-- Link 2 -->
   <link name="link2">
     <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0 0 0.005" rpy="0 0 0"/>
       <geometry>
         <mesh filename="package://PraRobSem6/meshes/prvi_zglob.stl" scale="0.01 0.01 0.01"/>
       </geometry>
-      <color rgba="0 0.8 0.0 1"/>
+      <material name="">
+        <color rgba="0 0 0 1.0"/>
+      </material>
     </visual>
 
     <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0 0 0.005" rpy="0 0 0"/>
       <geometry>
         <mesh filename="package://PraRobSem6/meshes/prvi_zglob.stl" scale="0.01 0.01 0.01"/>
       </geometry>
@@ -58,15 +61,15 @@
   <joint name="joint2" type="revolute">
     <parent link="link2"/>
     <child link="link3"/>
-    <origin xyz="0.0 0.0 0" rpy="0 0 0"/>
-    <axis xyz="1 0 0"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
     <limit velocity="10.0" effort="1" lower="-2.82743338823" upper="2.82743338823" />
   </joint>
 
   <!-- Link 3 -->
   <link name="link3">
     <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0 0 0.1" rpy="0 0 0"/>
       <geometry>
         <mesh filename="package://PraRobSem6/meshes/drugi_zglob.stl" scale="0.01 0.01 0.01"/>
       </geometry>
@@ -74,7 +77,7 @@
     </visual>
 
     <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0 0 0.1" rpy="0 0 0"/>
       <geometry>
         <mesh filename="package://PraRobSem6/meshes/drugi_zglob.stl" scale="0.01 0.01 0.01"/>
       </geometry>
@@ -85,15 +88,15 @@
   <joint name="joint3" type="revolute">
     <parent link="link3"/>
     <child link="link_tool"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="1 0 0"/>
+    <origin xyz="0 0 0.2" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
     <limit velocity="10.0" effort="1" lower="-2.82743338823" upper="2.82743338823" />
   </joint>
 
   <!-- link_tool -->
   <link name="link_tool">
     <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0 0 0.0825" rpy="0 0 0"/>
       <geometry>
         <mesh filename="package://PraRobSem6/meshes/treci_zglob.stl" scale="0.01 0.01 0.01"/>
       </geometry>
@@ -101,7 +104,7 @@
     </visual>
 
     <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin xyz="0 0 0.0825" rpy="0 0 0"/>
       <geometry>
         <mesh filename="package://PraRobSem6/meshes/treci_zglob.stl" scale="0.01 0.01 0.01"/>
       </geometry>
